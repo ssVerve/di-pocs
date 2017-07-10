@@ -1,7 +1,8 @@
 import string
 import random
-from luigi import Task,ExternalTask,LocalTarget,DateParameter 
-from luigi.contrib.s3 import S3FlagTarget
+from luigi import Task,ExternalTask,LocalTarget,DateParameter,Parameter
+from luigi.contrib.s3 import S3FlagTarget,S3FlagTask
+from luigi.contrib.mysqldb import MySqlTarget
 from vrvm.myboto.s3 import S3
 from vrvm import ctrl_tbl_api
 
@@ -11,12 +12,18 @@ s3 = S3()
 def rand(size=32, chars=string.ascii_uppercase + string.digits):
   return ''.join(random.choice(chars) for _ in range(size))
 
-class DatedExternalTask(ExternalTask):
+# class DatedExternalTask(ExternalTask):
+#   date = DateParameter()
+#   def output(self): return LocalTarget("pocOutput/%s/%s.tsv" % (self.__class__.__name__, self.date))
+  
+class ExternalDatedS3DummyFlagTask(ExternalTask):
   date = DateParameter()
-  def output(self): return LocalTarget("pocOutput/%s/%s.tsv" % (self.__class__.__name__, self.date))
+  def output(self): return S3FlagTarget('s3://verve-home/scottstewart/luigi/%s/%s/' % (self.__class__.__name__,self.date))
 
-class DWDimsStageToS3(DatedExternalTask): pass
-class RTBLog(DatedExternalTask): pass
+class TestS3ExternalTask(ExternalDatedS3DummyFlagTask): pass
+
+class DWDimsStageToS3(ExternalDatedS3DummyFlagTask): pass
+class RTBLog(ExternalDatedS3DummyFlagTask): pass
 # class AdcelLog(DatedExternalTask): pass
 
 class DatedDummyTask(Task):
@@ -49,9 +56,13 @@ class AdcelRaw2PostTarget(S3FlagTarget): # only checks for prefix of flag instea
   def exists(self): 
     return ctrl_tbl_api.CtrlTblApi(self.ctrl_table_dsn).count_unprocessed_logs('reporting', self.date) < 1
 
-class DWDimsLoadToRedshift(DatedDummyTask):
+class MySqlDatedDummyTask(Task):
+  date = DateParameter()
+  def output(self): return MySqlTarget()
+  
+class DWDimsLoadToRedshift(DatedDummyTask): #TODO: either wrap or rewrite luigi.contrib.MySqlTarget to use our MySql library
   def requires(self): return [DWDimsStageToS3(self.date)]
-class UpdateTargetTactic(DatedDummyTask):
+class UpdateTargetTactic(DatedDummyTask): #TODO: either wrap or rewrite luigi.contrib.MySqlTarget to use our MySql library
   def requires(self): return [DWDimsLoadToRedshift(self.date)]
 class FlightConfigsPois(S3FlagDatedDummyTask):
   def output(self): return S3FlagPrefixTarget('s3://verve-home/scottstewart/luigi/%s/' % (self.__class__.__name__), flag='updated_%s' % self.date)
