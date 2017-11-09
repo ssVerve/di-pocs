@@ -22,28 +22,22 @@ import java.nio.charset.StandardCharsets
 import org.apache.spark.internal.Logging
 import com.github.mitallast.nsq._
 
-class CustomReceiver(host: String, port: Int) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) with Logging {
+class CustomReceiver(host: String, port: Int, topic: String) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) with Logging {
   import scala.concurrent.duration._
 
   var client:NSQClient = null
   
   def onStart() {
     client = NSQClient(new NSQLookupDefault(List(s"http://$host:$port")))
-    val consumer = client.consumer(topic="test") { msg =>
+    val consumer = client.consumer(topic=this.topic) { msg =>
         log.error("received: {}", msg)
         store(new String(msg.data))
-        // send `TOUCH msgid` message request 
-        msg.touch() 
-        // send `REQ msdid 100` message request
-        msg.req(100 seconds)
-        // send `FIN msgid` message request
         msg.fin()
     }
   }
 
   def onStop() {
-    // There is nothing much to do as the thread calling receive()
-    // is designed to stop by itself if isStopped() returns false
+    client.close()
   }
 }
 
@@ -54,9 +48,7 @@ object SparkStreaming extends App {{ // double braces fixes NPE https://issues.a
   val ssc = new StreamingContext(sc, Seconds(1))
   
   // Create a DStream that will connect to hostname:port, like localhost:9999
-//  val lines = ssc.socketTextStream("10.233.117.61", 9999)
-//    val lines = ssc.receiverStream(new CustomReceiver("10.233.117.61", 9999))
-    val lines = ssc.receiverStream(new CustomReceiver("10.167.216.110", 4161))
+  val lines = ssc.receiverStream(new CustomReceiver("10.63.237.25", 4161, "test-ss"))
 
   // Split each line into words
   val words = lines.flatMap(_.split(" "))
@@ -68,6 +60,8 @@ object SparkStreaming extends App {{ // double braces fixes NPE https://issues.a
   wordCounts.print()  
   
   ssc.start()             // Start the computation
+  
+  ssc.stop(stopSparkContext=false)
 //  ssc.awaitTermination()  // Wait for the computation to terminate
   
 }}
