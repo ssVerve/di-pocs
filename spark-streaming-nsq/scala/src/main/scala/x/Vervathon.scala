@@ -43,7 +43,7 @@ class CustomReceiver(host: String, port: Int, topic: String) extends Receiver[St
   }
 
   def onStop() {
-    //client.close()
+    client.close()
   }
 }
 
