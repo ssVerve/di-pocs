@@ -14,7 +14,8 @@ libraryDependencies ++= Seq(
 	"com.github.mitallast" % "scala-nsq_2.11" % "1.11",
 	"com.typesafe" % "config" % "1.3.1",
 	"com.databricks" % "spark-avro_2.11" % "4.0.0",
-	"com.github.nscala-time" %% "nscala-time" % "2.18.0"
+	"com.github.nscala-time" %% "nscala-time" % "2.18.0",
+	"commons-validator" % "commons-validator" % "1.5.1"
 )
 
 resolvers ++= Seq(
