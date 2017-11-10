@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import com.databricks.spark.avro._
 import org.apache.spark.sql._
+import com.github.nscala_time.time.Imports._
 
 class CustomReceiver(host: String, port: Int, topic: String) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) with Logging {
   import scala.concurrent.duration._
@@ -47,7 +48,6 @@ class CustomReceiver(host: String, port: Int, topic: String) extends Receiver[St
   }
 }
 
-
 object RTBAvroLogger extends App {{
   val config = ConfigFactory.load()
   println(config)
@@ -56,17 +56,20 @@ object RTBAvroLogger extends App {{
   val port = config.getInt("nsq.port")
   val topic = config.getString("nsq.topic")
   val interval = config.getLong("batch.inverval.seconds")
-  val outputDirectory = config.getString("output.directory")
+  val outputDirectoryRoot = config.getString("output.directory")
+
+  val format = DateTimeFormat.forPattern("yyyy-MM-dd/HH").withZone(DateTimeZone.UTC)
 
   val sc = new SparkContext(new SparkConf())
   val ssc = new StreamingContext(sc, Seconds(interval))
   val spark = SparkSession.builder().getOrCreate()
 
   val stream = ssc.receiverStream(new CustomReceiver(host, port, topic))
-  //val messages = stream.flatMap(_.split("\n"))
 
   stream.foreachRDD { rdd =>
     val df = spark.read.json(rdd)
+    val dateWithHour = format.print(DateTime.now)
+    val outputDirectory = s"$outputDirectoryRoot/$dateWithHour"
     df.write.mode("append").avro(outputDirectory)
   }
 
