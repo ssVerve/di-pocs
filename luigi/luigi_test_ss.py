@@ -1,6 +1,7 @@
 import string
 import random
-from luigi import Task,ExternalTask,LocalTarget,DateParameter,Parameter
+import time
+from luigi import Task,ExternalTask,LocalTarget,DateParameter,Parameter,Target
 from luigi.contrib.s3 import S3FlagTarget,S3FlagTask
 from luigi.contrib.mysqldb import MySqlTarget
 from vrvm.myboto.s3 import S3
@@ -45,12 +46,12 @@ class S3FlagDatedDummyTask(Task):
       s3.put(outPath + ('part-0000%s' % i), rand()) 
     s3.put(outPath + self.output().flag, '')
     
-class S3FlagPrefixTarget(S3FlagTarget):
+class S3FlagPrefixTarget(S3FlagTarget): # only checks for prefix of flag instead that key exists for flight-configs
   def exists(self): return any(True for _ in s3._ls(self.path + self.flag))
     
-class AdcelRaw2PostTarget(S3FlagTarget): # only checks for prefix of flag instead that key exists for flight-configs
+class AdcelRaw2PostTarget(Target): # query unprocessed logs for a given date and include path
   def __init__(self, path, date, ctrl_table_dsn='clientrds-dw-prod-control'):
-    super(S3FlagTarget, self).__init__(path, flag=None)
+    self.path = path
     self.date = date
     self.ctrl_table_dsn = ctrl_table_dsn
   def exists(self): 
